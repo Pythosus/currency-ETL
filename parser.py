@@ -49,5 +49,5 @@ def crypto_parser(url) -> list:
 
     return data
 
-#print(crypto_parser('https://www.coingecko.com/ru'))
+print(crypto_parser('https://www.coingecko.com/ru'))
 #print(currency_parser('https://cbr.ru/currency_base/daily'))
