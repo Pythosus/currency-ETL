@@ -1,5 +1,5 @@
-cb_url = 'https://www.coingecko.com/ru'
-crypt_url = 'https://cbr.ru/currency_base/daily'
+crypto_url = 'https://www.coingecko.com/ru'
+cb_url = 'https://cbr.ru/currency_base/daily'
 
 hostname = 'localhost'
 username = 'postgres'
