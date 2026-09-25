@@ -1,0 +1,109 @@
+name: currency-ETL
+
+version: '3.8'
+
+x-airflow-common:
+  &airflow-common
+  image: apache/airflow:2.8.1
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgre:1276@postgres:5432/money
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+services:
+  postgres:
+    image: postgres:15
+    container_name: money_DB
+    environment:
+      POSTGRES_USER: postgre
+      POSTGRES_PASSWORD: 1276
+      POSTGRES_DB: money
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./init_base:/docker-entrypoint-initdb.d/
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgre", "-d", "money"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+    networks:
+      - airflow-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - airflow-network
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow_init
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    command: version
+    networks:
+      - airflow-network
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow_webserver
+    ports:
+      - "8085:8080"
+    command: webserver
+    restart: always
+    environment:
+      <<: *airflow-common-env
+      PYTHONPATH: "/opt/airflow:${PYTHONPATH}"
+    volumes:
+      - ./:/opt/airflow 
+      - ./logs:/opt/airflow/logs
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    networks:
+      - airflow-network
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow_scheduler
+    command: scheduler
+    restart: always
+    environment:
+      <<: *airflow-common-env
+      PYTHONPATH: "/opt/airflow:${PYTHONPATH}"
+    volumes:
+      - ./:/opt/airflow
+      - ./logs:/opt/airflow/logs
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    networks:
+      - airflow-network
+
+networks:
+  airflow-network:
+    driver: bridge
+
+volumes:
+  pgdata: 
